@@ -1,0 +1,8 @@
+---
+title: "Trabajo_lineal"
+author: "Antonio_Menendez"
+date: "2025-02-17"
+output: html_document
+---
+
+Hola Mundo
