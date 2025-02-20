@@ -1,0 +1,374 @@
+---
+title: "Modelo Probados"
+author: "Dajuanse"
+date: "2025-02-20"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Primer Modelo Probado (prueba 5):
+
+```{r}
+# Cargar librería
+library(wavethresh)
+
+# Convertir la señal a formato numérico
+y_numeric <- as.numeric(y)
+
+# Ajustar la longitud a la potencia de 2 más cercana superior
+n_original <- length(y_numeric)
+n_pot2 <- 2^ceiling(log2(n_original))  # Encuentra la siguiente potencia de 2
+y_padded <- c(y_numeric, rep(0, n_pot2 - n_original))  # Rellenar con ceros si es necesario
+
+# Aplicar Transformada Wavelet Discreta (DWT)
+dwt_result <- wd(y_padded, filter.number=1, family="DaubExPhase")
+
+# Aplicar umbral adaptativo para reducir ruido sin perder demasiada información
+threshold <- 0.2 * max(abs(dwt_result$D))  # Establecemos un umbral dinámico
+dwt_result$D <- lapply(dwt_result$D, function(x) ifelse(abs(x) < threshold, 0, x))
+
+# Reconstruir la señal filtrada
+y_denoised_padded <- wr(dwt_result)
+
+# Recuperar la señal original sin los ceros añadidos
+y_denoised <- y_denoised_padded[1:n_original]
+
+# Evaluar la reducción de ruido
+mse_wavelet <- mean((y_numeric - y_denoised)^2)
+cor_wavelet <- cor(y_numeric, y_denoised)
+
+# Mostrar resultados
+cat("MSE Wavelet Ajustado:", mse_wavelet, " | Correlación Wavelet Ajustado:", cor_wavelet, "\n")
+
+# Guardar la señal filtrada en CSV
+write.csv(data.frame(Senal_Filtrada = y_denoised), "y_denoised_completa.csv", row.names = FALSE)
+
+cat("Modelo guardado en y_denoised_completa.csv\n")
+
+```
+
+![](images/clipboard-1922888370.png)
+
+## Segundo Moldeo Probado (buen modelo 1):
+
+```{r}
+# Cargar matriz reducida si no se ha cargado
+load("freq_amp.Rdata")
+
+# Ajustar modelo de regresión lineal
+modelo <- lm(y ~ freq.amp)
+
+# Obtener predicciones
+y_pred <- predict(modelo)
+
+# Guardar los valores predichos
+save(y_pred, file="prediccion_cabritus.Rdata")
+
+# Guardar las predicciones en un archivo CSV
+write.csv(data.frame(Predicciones = y_pred), "prediccion_cabritus.csv", row.names = FALSE)
+
+cat("Predicciones guardadas en prediccion_cabritus.csv\n")
+```
+
+![](images/clipboard-1308118645.png)
+
+## Tercer Intento (buen modelo 1):
+
+```{r}
+####----Probamos añadiendo funciones:----####
+# Probamos con el umbral de 0.01 (más funciones de Fourier)
+X_filtrado <- X[, seleccion[[1]], drop = FALSE]  # Selección con umbral 0.01
+
+# Ajustamos el modelo lineal
+modelo <- lm(cabritus@left ~ X_filtrado)
+
+# Predicción
+y_pred <- predict(modelo)
+
+# Nuevo MSE
+mse <- mean((cabritus@left - y_pred)^2)
+cat("Nuevo MSE:", mse)
+
+# Graficamos la señal original vs predicción
+plot(cabritus@left[1:200], type = "l", col = "black", ylab = "Valores del archivo de sonido", xlab = "Index")
+lines(y_pred[1:200], col = "red")  
+
+#¡Hemos logrado reducir el MSE significativamente! 🎉 Pasamos de 35,053,815 a 27,271,349, lo que indica que incluir más funciones de Fourier ha mejorado el ajuste.
+
+
+#Probamos a seguir reduciendo:
+
+# Probamos con un umbral menor (0.007) para ver si mejora el ajuste
+umbral_nuevo <- 0.007
+seleccion_nueva <- which(abs(cors) > umbral_nuevo)
+X_filtrado_nuevo <- X[, seleccion_nueva, drop = FALSE]
+
+# Ajustamos el modelo lineal con más funciones
+modelo_nuevo <- lm(cabritus@left ~ X_filtrado_nuevo)
+
+# Nueva predicción
+y_pred_nuevo <- predict(modelo_nuevo)
+
+# Nuevo MSE
+mse_nuevo <- mean((cabritus@left - y_pred_nuevo)^2)
+cat("MSE con umbral 0.007:", mse_nuevo)
+
+# Graficamos la señal original vs predicción mejorada
+plot(cabritus@left[1:200], type = "l", col = "black", ylab = "Valores del archivo de sonido", xlab = "Index")
+lines(y_pred_nuevo[1:200], col = "blue")  # Nueva predicción en azul
+
+
+#Probamos a seguir reduciendo:
+
+
+# Probamos con un umbral aún menor (0.005)
+umbral_mejorado <- 0.005
+seleccion_mejorada <- which(abs(cors) > umbral_mejorado)
+X_filtrado_mejorado <- X[, seleccion_mejorada, drop = FALSE]
+
+# Ajustamos el modelo con más funciones de Fourier
+modelo_mejorado <- lm(cabritus@left ~ X_filtrado_mejorado)
+
+# Nueva predicción
+y_pred_mejorado <- predict(modelo_mejorado)
+
+# Nuevo MSE
+mse_mejorado <- mean((cabritus@left - y_pred_mejorado)^2)
+cat("MSE con umbral 0.005:", mse_mejorado)
+
+# Graficamos la nueva predicción
+plot(cabritus@left[1:200], type = "l", col = "black", ylab = "Valores del archivo de sonido", xlab = "Index")
+lines(y_pred_mejorado[1:200], col = "green")  # Nueva predicción en verde
+
+
+#Continuamos bajando el umbral:
+
+# Probamos con un umbral aún menor (0.004)
+umbral_nuevo <- 0.004
+seleccion_nueva <- which(abs(cors) > umbral_nuevo)
+X_filtrado_nuevo <- X[, seleccion_nueva, drop = FALSE]
+
+# Ajustamos el modelo con más funciones de Fourier
+modelo_nuevo <- lm(cabritus@left ~ X_filtrado_nuevo)
+
+# Nueva predicción
+y_pred_nuevo <- predict(modelo_nuevo)
+
+# Nuevo MSE
+mse_nuevo <- mean((cabritus@left - y_pred_nuevo)^2)
+cat("MSE con umbral 0.004:", mse_nuevo)
+
+# Graficamos la nueva predicción
+plot(cabritus@left[1:200], type = "l", col = "black", ylab = "Valores del archivo de sonido", xlab = "Index")
+lines(y_pred_nuevo[1:200], col = "blue")  # Nueva predicción en azul
+
+
+write.csv(data.frame(Prediccion_004 = y_pred_nuevo), "cabritus_filtrado0004.csv", row.names = FALSE)
+
+cat("Archivo cabritus_filtrado0004.csv guardado con éxito.\n")
+
+
+
+#Seguimos bajando:
+
+# Probamos con un umbral aún menor (0.003)
+umbral_003 <- 0.003
+seleccion_003 <- which(abs(cors) > umbral_003)
+X_filtrado_003 <- X[, seleccion_003, drop = FALSE]
+
+# Ajustamos el modelo con más funciones de Fourier
+modelo_003 <- lm(cabritus@left ~ X_filtrado_003)
+
+# Nueva predicción
+y_pred_003 <- predict(modelo_003)
+
+# Nuevo MSE
+mse_003 <- mean((cabritus@left - y_pred_003)^2)
+cat("MSE con umbral 0.003:", mse_003)
+
+# Graficamos la nueva predicción
+plot(cabritus@left[1:200], type = "l", col = "black", ylab = "Valores del archivo de sonido", xlab = "Index")
+lines(y_pred_003[1:200], col = "red")  # Nueva predicción en morado
+
+
+#Seguimos bajando:
+
+# Probamos con un umbral aún menor (0.0025)
+umbral_0025 <- 0.0025
+seleccion_0025 <- which(abs(cors) > umbral_0025)
+X_filtrado_0025 <- X[, seleccion_0025, drop = FALSE]
+
+# Ajustamos el modelo con más funciones de Fourier
+modelo_0025 <- lm(cabritus@left ~ X_filtrado_0025)
+
+# Nueva predicción
+y_pred_0025 <- predict(modelo_0025)
+
+# Nuevo MSE
+mse_0025 <- mean((cabritus@left - y_pred_0025)^2)
+cat("MSE con umbral 0.0025:", mse_0025)
+
+# Graficamos la nueva predicción
+plot(cabritus@left[1:200], type = "l", col = "black", ylab = "Valores del archivo de sonido", xlab = "Index")
+lines(y_pred_0025[1:200], col = "purple")  # Nueva predicción en naranja
+
+
+#Puede que sea la ultima bajada:
+
+# Probamos con un umbral aún menor (0.002)
+umbral_002 <- 0.002
+seleccion_002 <- which(abs(cors) > umbral_002)
+X_filtrado_002 <- X[, seleccion_002, drop = FALSE]
+
+# Ajustamos el modelo con más funciones de Fourier
+modelo_002 <- lm(cabritus@left ~ X_filtrado_002)
+
+# Nueva predicción
+y_pred_002 <- predict(modelo_002)
+
+# Nuevo MSE
+mse_002 <- mean((cabritus@left - y_pred_002)^2)
+cat("MSE con umbral 0.002:", mse_002)
+
+# Graficamos la nueva predicción
+plot(cabritus@left[1:200], type = "l", col = "black", ylab = "Valores del archivo de sonido", xlab = "Index")
+lines(y_pred_002[1:200], col = "blue")  # Nueva predicción en azul
+
+
+#Nos quedaríamos con el de 0.0025
+# Guardamos la mejor predicción con umbral 0.0025
+save(y_pred_0025, file = "cabritus_filtrado00025.Rdata")
+
+# Confirmamos que el archivo se ha guardado
+cat("Archivo cabritus_filtrado00025.Rdata guardado con éxito.\n")
+
+# Guardar la mejor predicción en un archivo CSV
+write.csv(data.frame(Prediccion_Filtrada = y_pred_0025), "cabritus_filtrado00025.csv", row.names = FALSE)
+
+# Confirmación
+cat("Archivo cabritus_filtrado00025.csv guardado con éxito.\n")
+
+```
+
+![](images/clipboard-653317575.png)
+
+## Cuarto Intento: Prueba 7.1
+
+```{r}
+# 📌 Cargar librerías necesarias
+library(tuneR)      # Manejo de audio
+library(signal)     # Filtros digitales
+library(wavethresh) # Transformada Wavelet
+library(glmnet)     # Ridge Regression
+
+# 📌 Cargar los datos originales (NO MODIFICAMOS ESTO)
+load("cabritus.RData")
+sonido <- cabritus@left  # Vector de sonido ruidoso
+
+# 📌 Cargar la matriz de Fourier ya generada
+load("freq_amp.RData")
+
+# 📌 Ajuste del modelo Ridge para estimar la señal original
+modelo_ridge <- cv.glmnet(freq.amp, sonido, alpha = 0)  # Ridge Regression
+y_hat_ridge <- predict(modelo_ridge, newx = freq.amp, s = "lambda.min")
+
+write.csv(data.frame(Prediccion_Ridge = y_hat_ridge), "cabritus_ridge.csv", row.names = FALSE)
+
+cat("Archivo cabritus_ridge.csv guardado con éxito.\n")
+
+```
+
+![](images/clipboard-4034213539.png)
+
+## Quinto Intento (Prueba 7.1):
+
+```{r}
+# 📌 Cargar librerías necesarias
+library(tuneR)      # Manejo de audio
+library(signal)     # Filtros digitales
+library(wavethresh) # Transformada Wavelet
+library(glmnet)     # Ridge Regression
+library(splines)    # Interpolación Spline
+
+# 📌 Cargar los datos originales
+load("cabritus.RData")
+sonido <- cabritus@left  # Vector de sonido ruidoso
+
+# 📌 Cargar la matriz de Fourier ya generada
+load("freq_amp.RData")
+
+# 📌 Ajuste del modelo Ridge para estimar la señal original
+modelo_ridge <- cv.glmnet(freq.amp, sonido, alpha = 0)  # Ridge Regression
+y_hat_ridge <- predict(modelo_ridge, newx = freq.amp, s = "lambda.min")
+
+# 📌 Guardamos la predicción Ridge
+write.csv(data.frame(Prediccion_Ridge = y_hat_ridge), "cabritus_ridge.csv", row.names = FALSE)
+cat("Archivo cabritus_ridge.csv guardado con éxito.\n")
+
+# 📌 FILTRADO PASA-BAJOS: Eliminamos ruido de alta frecuencia con Butterworth
+butter_filtro <- butter(4, 0.1, type = "low")  # Orden 4, corte 0.1 (ajustable)
+y_filtrada <- filtfilt(butter_filtro, y_hat_ridge)
+
+# 📌 **Interpolación para ajustar a potencia de 2**
+n_original <- length(y_filtrada)  # 19,764
+n_nuevo <- 32768  # Potencia de 2 más cercana hacia arriba
+
+x_original <- seq(1, n_original)
+x_nuevo <- seq(1, n_original, length.out = n_nuevo)
+
+y_interpolado <- spline(x_original, y_filtrada, xout = x_nuevo)$y  # Interpolación spline
+
+# 📌 TRANSFORMADA WAVELET ESTACIONARIA (SWT)
+dwt_result <- wst(y_interpolado, filter.number = 4, family = "DaubExPhase")
+
+# 📌 Umbral adaptativo de eliminación de ruido
+threshold <- sqrt(2 * log(length(y_interpolado))) * mad(unlist(dwt_result$D))
+dwt_result$D <- lapply(dwt_result$D, function(x) ifelse(abs(x) < threshold, 0, x))
+
+# 📌 **Reconstrucción de la señal filtrada**
+y_wavelet <- AvBasis(dwt_result)  # ✅ Corrección: función correcta para reconstruir
+
+# 📌 RECORTAR LA SEÑAL PARA VOLVER A 19,764 VALORES
+y_final <- y_wavelet[1:19764]
+
+# 📌 Evaluación de modelos: MSE y SNR
+mse_ridge <- mean((sonido - y_hat_ridge)^2)
+mse_wavelet <- mean((sonido - y_final)^2)
+
+snr_wavelet <- 10 * log10(var(y_final) / var(y_final - sonido))
+
+cat("🔹 MSE Ridge:", mse_ridge, "\n")
+cat("🔹 MSE Wavelet:", mse_wavelet, "\n")
+cat("🔹 SNR Wavelet:", snr_wavelet, "dB\n")
+
+# 📌 Guardamos la mejor estimación en CSV
+write.csv(data.frame(Senal_Filtrada = y_final), "cabritus_filtrado.csv", row.names = FALSE)
+cat("Archivo cabritus_filtrado.csv guardado con éxito.\n")
+
+```
+
+![](images/clipboard-830969481.png)
+
+## Sexto Modelo EL BUENOOOOOOOOO
+
+```{r}
+# Ajustar el modelo con Lasso
+lasso_model <- cv.glmnet(freq.amp, y, alpha = 1)  # alpha=1 para Lasso
+
+# Obtener coeficientes óptimos
+beta_lasso <- coef(lasso_model, s = "lambda.min")
+
+# Obtener valores ajustados
+y_hat_lasso <- predict(lasso_model, newx = freq.amp, s = "lambda.min")
+
+# Crear un data frame con los valores ajustados
+y_hat_lasso_df <- data.frame(Valores_Ajustados = as.vector(y_hat_lasso))
+
+# Guardar en un archivo CSV
+write.csv(y_hat_lasso_df, "valores_ajustados_lasso.csv", row.names = FALSE)
+```
+
+![](images/clipboard-1985330217.png)
